@@ -102,9 +102,9 @@ class _SharedInceptionLabs:
             ge=0,
             default=None,
         )
-        diffusing: bool = Field(
-            description="Enable diffusing mode for animated responses",
-            default=True,
+        no_diffusion: bool = Field(
+            description="Set to true to disable diffusing mode (API call and animation). Diffusion is ON by default.",
+            default=False,
         )
 
     def __init__(self, our_model_id, inception_id):
@@ -141,7 +141,7 @@ class _SharedInceptionLabs:
         body = {
             "model": self.inception_id,
             "messages": messages,
-            "diffusing": prompt.options.diffusing,
+            "diffusing": not prompt.options.no_diffusion,
         }
         if prompt.options.max_tokens:
             body["max_tokens"] = prompt.options.max_tokens
@@ -164,7 +164,9 @@ class InceptionLabs(_SharedInceptionLabs, llm.KeyModel):
         if stream:
             body_params["stream"] = True
 
-        if stream and prompt.options.diffusing and RICH_AVAILABLE and sys.stdout.isatty():
+        should_run_rich_animation = stream and (not prompt.options.no_diffusion) and RICH_AVAILABLE and sys.stdout.isatty()
+
+        if should_run_rich_animation:
             live_display_text = Text()
             last_sse_data = None
             displayed_final_content = False
