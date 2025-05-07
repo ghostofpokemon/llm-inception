@@ -1,0 +1,33 @@
+[project]
+name = "llm-inception"
+version = "0.2"
+description = "Run prompts against LLMs hosted by https:///inceptionlabs.ai//"
+readme = "README.md"
+authors = [{name = "NickMystic"}]
+license = {text = "MIT"}
+classifiers = [
+    "License :: OSI Approved :: MIT Software License"
+]
+requires-python = ">=3.9"
+dependencies = [
+    "llm>=0.22",
+    "httpx",
+    "httpx-sse",
+    "rich",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/ghostofpokemon/llm-inception"
+Changelog = "https://github.com/ghostofpokemon/llm-inception/releases"
+Issues = "https://github.com/ghostofpokemon/llm-inception/issues"
+CI = "https://github.com/ghostofpokemon/llm-inception/actions"
+
+[project.entry-points.llm]
+inception = "llm_inception"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-recording", "pytest-asyncio"]

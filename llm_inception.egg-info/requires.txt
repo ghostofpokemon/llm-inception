@@ -1,0 +1,9 @@
+llm>=0.22
+httpx
+httpx-sse
+rich
+
+[test]
+pytest
+pytest-recording
+pytest-asyncio
