@@ -1,6 +1,6 @@
 # llm-inception
 
-[![PyPI](https://img.shields.io/pypi/v/llm-inception.svg)](https://pypi.org/project/llm-inception/)
+[![PyPI](https://img.shields.io/pypi/v/llm-inception.svg)](https://pypi.org/project/llm-inception/0.2.1/)
 [![Changelog](https://img.shields.io/github/v/release/ghostofpokemon/llm-inception?include_prereleases&label=changelog)](https://github.com/ghostofpokemon/llm-inception/releases)
 [![Tests](https://github.com/ghostofpokemon/llm-inception/actions/workflows/test.yml/badge.svg)](https://github.com/ghostofpokemon/llm-inception/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ghostofpokemon/llm-inception/blob/main/LICENSE)
