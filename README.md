@@ -1,27 +1,3 @@
-Metadata-Version: 2.4
-Name: llm-inception
-Version: 0.2
-Summary: Run prompts against LLMs hosted by https:///inceptionlabs.ai//
-Author: NickMystic
-License: MIT
-Project-URL: Homepage, https://github.com/ghostofpokemon/llm-inception
-Project-URL: Changelog, https://github.com/ghostofpokemon/llm-inception/releases
-Project-URL: Issues, https://github.com/ghostofpokemon/llm-inception/issues
-Project-URL: CI, https://github.com/ghostofpokemon/llm-inception/actions
-Classifier: License :: OSI Approved :: MIT Software License
-Requires-Python: >=3.9
-Description-Content-Type: text/markdown
-License-File: LICENSE
-Requires-Dist: llm>=0.22
-Requires-Dist: httpx
-Requires-Dist: httpx-sse
-Requires-Dist: rich
-Provides-Extra: test
-Requires-Dist: pytest; extra == "test"
-Requires-Dist: pytest-recording; extra == "test"
-Requires-Dist: pytest-asyncio; extra == "test"
-Dynamic: license-file
-
 # llm-lambda-labs
 
 [![PyPI](https://img.shields.io/pypi/v/llm-lambda-labs.svg)](https://pypi.org/project/llm-lambda-labs/)

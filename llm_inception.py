@@ -161,15 +161,15 @@ class InceptionLabs(_SharedInceptionLabs, llm.KeyModel):
         response._prompt_json = {"messages": messages}
         body_params = self.build_request_body(prompt, conversation)
 
-        if stream: 
+        if stream:
             body_params["stream"] = True
 
         if stream and prompt.options.diffusing and RICH_AVAILABLE and sys.stdout.isatty():
-            text_display = Text()
-            final_model_output = None
+            live_display_text = Text()
             last_sse_data = None
-
-            with Live(text_display, screen=True, refresh_per_second=10, transient=True) as live:
+            displayed_final_content = False
+            
+            with Live(live_display_text, refresh_per_second=10, transient=False) as live:
                 try:
                     with httpx.Client() as client:
                         with connect_sse(
@@ -181,18 +181,18 @@ class InceptionLabs(_SharedInceptionLabs, llm.KeyModel):
                             for sse in event_source.iter_sse():
                                 if not last_sse_data and event_source.response.is_error:
                                     error_body_preview = b""
-                                    try:
-                                        error_body_preview = event_source.response.read()
-                                    except Exception:
-                                        pass
+                                    try: error_body_preview = event_source.response.read()
+                                    except Exception: pass
                                     error_text = error_body_preview.decode(errors='replace')[:500] if error_body_preview else event_source.response.reason_phrase
+                                    live.stop()
                                     raise llm.ModelError(f"API Error: {event_source.response.status_code} - {error_text}")
                                 event_source.response.raise_for_status()
 
                                 if sse.event == "error":
+                                    live.stop()
                                     raise llm.ModelError(f"API SSE Error: {sse.data}")
                                 if sse.data == "[DONE]":
-                                    break 
+                                    break
                                 
                                 try:
                                     data = sse.json()
@@ -202,36 +202,38 @@ class InceptionLabs(_SharedInceptionLabs, llm.KeyModel):
 
                                 if data.get("choices") and data["choices"][0].get("delta") and "content" in data["choices"][0]["delta"]:
                                     content_chunk = data["choices"][0]["delta"]["content"]
-                                    text_display.plain = content_chunk 
+                                    live_display_text.plain = content_chunk
 
                                     if data.get("diffusion_meta", {}).get("diffusion_progress", 0.0) >= 1.0:
-                                        final_model_output = content_chunk 
-                                        text_display.plain = final_model_output 
-                                        live.refresh() 
+                                        live_display_text.plain = content_chunk 
+                                        displayed_final_content = True
                                 
                 except httpx.HTTPStatusError as e:
-                    error_detail = e.response.text if e.response and hasattr(e.response, 'text') and not e.response.is_stream_consumed else e.response.reason_phrase if e.response else "Unknown HTTP error"
+                    live.stop()
+                    error_detail = e.response.text if e.response and hasattr(e.response, 'text') and not e.response.is_stream_consumed else e.response.reason_phrase if e.response else "Unknown"
                     if e.response and not e.response.is_stream_consumed:
-                         try:
-                            e.response.read() 
-                            error_detail = e.response.text
-                         except Exception:
-                            pass 
+                         try: e.response.read(); error_detail = e.response.text
+                         except Exception: pass 
                     raise llm.ModelError(f"API HTTP Error: {e.request.method} {e.request.url} - Status {e.response.status_code} - {error_detail}")
-
                 except Exception as e: 
-                    live.stop() 
+                    live.stop()
                     raise llm.ModelError(f"Error during streaming: {str(e)}")
-
-            if final_model_output is not None:
-                yield final_model_output
-            elif last_sse_data and last_sse_data.get("choices") and \
-                 last_sse_data["choices"][0].get("message", {}).get("content"): 
-                yield last_sse_data["choices"][0]["message"]["content"]
-
+            
+            if live_display_text.plain.strip() or displayed_final_content:
+                yield ""
+            
             if last_sse_data: 
                 usage_info = last_sse_data.pop("usage", None)
-                last_sse_data.pop("choices", None) 
+                if 'choices' in last_sse_data and isinstance(last_sse_data['choices'], list) and len(last_sse_data['choices']) > 0:
+                    choice = last_sse_data['choices'][0]
+                    if 'delta' in choice: del choice['delta']
+                    if 'message' in choice and choice.get('message', {}).get('content'):
+                        pass
+                    elif not choice:
+                        del last_sse_data['choices'][0]
+                if 'choices' in last_sse_data and not last_sse_data['choices']:
+                    del last_sse_data['choices']
+                
                 self.set_usage(response, usage_info)
                 response.response_json = last_sse_data
 
@@ -290,7 +292,7 @@ class InceptionLabs(_SharedInceptionLabs, llm.KeyModel):
                 self.set_usage(response, usage_info)
                 response.response_json = last_sse_data
         
-        else: 
+        else:
             with httpx.Client() as client:
                 api_response = client.post(
                     "https://api.inceptionlabs.ai/v1/chat/completions",
@@ -328,10 +330,10 @@ class AsyncInceptionLabs(_SharedInceptionLabs, llm.AsyncKeyModel):
             try:
                 async with httpx.AsyncClient() as client:
                     async with aconnect_sse(
-                        client, "POST", "https://api.inceptionlabs.ai/v1/chat/completions",
-                        headers={"Content-Type": "application/json", "Accept": "application/json", "Authorization": f"Bearer {key}"},
-                        json=body_params, 
-                        timeout=None
+                            client, "POST", "https://api.inceptionlabs.ai/v1/chat/completions",
+                            headers={"Content-Type": "application/json", "Accept": "application/json", "Authorization": f"Bearer {key}"},
+                            json=body_params, 
+                            timeout=None
                     ) as event_source:
                         async for sse in event_source.aiter_sse():
                             if not last_sse_data and event_source.response.is_error:
@@ -377,7 +379,7 @@ class AsyncInceptionLabs(_SharedInceptionLabs, llm.AsyncKeyModel):
                 last_sse_data.pop("choices", None)
                 self.set_usage(response, usage_info)
                 response.response_json = last_sse_data
-        else: 
+        else:
             async with httpx.AsyncClient() as client:
                 api_response = await client.post(
                     "https://api.inceptionlabs.ai/v1/chat/completions",

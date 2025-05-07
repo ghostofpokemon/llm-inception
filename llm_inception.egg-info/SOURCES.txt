@@ -1,4 +1,5 @@
 LICENSE
+README.md
 llm_inception.py
 pyproject.toml
 llm_inception.egg-info/PKG-INFO
