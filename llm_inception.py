@@ -6,6 +6,14 @@ import llm
 from pydantic import Field
 from typing import Optional
 import sys
+import time
+from pathlib import Path
+
+
+class DownloadError(Exception):
+    pass
+
+
 try:
     from rich.live import Live
     from rich.text import Text
@@ -14,43 +22,65 @@ except ImportError:
     RICH_AVAILABLE = False
 
 
-def fetch_models(key=None):
-    key = llm.get_key(key or "", "inception", "LLM_INCEPTION_KEY")
-    if not key:
-        raise click.ClickException(
-            "You must set the 'inception' key or the LLM_INCEPTION_KEY environment variable."
-        )
+def fetch_cached_json(url, path, cache_timeout, key=None):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        mod_time = path.stat().st_mtime
+        if time.time() - mod_time < cache_timeout:
+            with open(path, "r") as file:
+                return json.load(file)
+    
+    headers = {}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+
     try:
-        response = httpx.get(
-            "https://api.inceptionlabs.ai/v1/models",
-            headers={"Authorization": f"Bearer {key}"},
-            timeout=30,
-        )
+        response = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
         response.raise_for_status()
-        return response.json()["data"]
-    except httpx.HTTPStatusError as e:
-        raise click.ClickException(f"Error fetching models: {e.response.text}")
+        data = response.json()
+        with open(path, "w") as file:
+            json.dump(data, file)
+        return data
+    except httpx.HTTPError:
+        if path.is_file():
+            with open(path, "r") as file:
+                return json.load(file)
+        else:
+            raise DownloadError(
+                f"Failed to download data and no cache is available at {path}"
+            )
 
 
 def get_model_details(key=None, force_fetch=False):
-    user_dir = llm.user_dir()
-    inception_models = user_dir / "inception_models.json"
-    if inception_models.exists() and not force_fetch:
-        models = json.loads(inception_models.read_text())
-    else:
-        models = fetch_models(key=key)
-        inception_models.write_text(json.dumps(models, indent=2))
-    return models
+    return fetch_cached_json(
+        url="https://api.inceptionlabs.ai/v1/models",
+        path=llm.user_dir() / "inception_models.json",
+        cache_timeout=0 if force_fetch else 3600,
+        key=key,
+    ).get("data", [])
 
 
 @llm.hookimpl
 def register_models(register):
-    for model in get_model_details():
-        model_id = model["id"]
-        our_model_id = "inception/" + model_id
-        register(
-            InceptionLabs(our_model_id, model_id), AsyncInceptionLabs(our_model_id, model_id)
-        )
+    key = llm.get_key("", "inception", "LLM_INCEPTION_KEY")
+    if not key:
+        return
+    try:
+        models = get_model_details(key=key)
+        for model in models:
+            model_id = model["id"]
+            our_model_id = "inception/" + model_id
+            register(
+                InceptionLabs(our_model_id, model_id), AsyncInceptionLabs(our_model_id, model_id)
+            )
+    except DownloadError as e:
+        # Log error or notify user in a less disruptive way if needed
+        # For now, we'll just skip registration if models can't be fetched
+        # and no cache is available.
+        # You could add a click.echo(f"Warning: {e}", err=True) here if you
+        # want to be more verbose.
+        return
 
 
 def get_model_ids(key):
