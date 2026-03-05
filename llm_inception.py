@@ -22,7 +22,7 @@ except ImportError:
     RICH_AVAILABLE = False
 
 
-def fetch_cached_json(url, path, cache_timeout, key=None):
+def fetch_cached_json(url, path, cache_timeout, key=None, **kwargs):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file():
@@ -36,20 +36,18 @@ def fetch_cached_json(url, path, cache_timeout, key=None):
         headers["Authorization"] = f"Bearer {key}"
 
     try:
-        response = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
+        response = httpx.get(url, headers=headers, timeout=1.5, follow_redirects=True, **kwargs)
         response.raise_for_status()
         data = response.json()
         with open(path, "w") as file:
             json.dump(data, file)
         return data
-    except httpx.HTTPError:
+    except Exception:
         if path.is_file():
             with open(path, "r") as file:
                 return json.load(file)
         else:
-            raise DownloadError(
-                f"Failed to download data and no cache is available at {path}"
-            )
+            return {"data": []}
 
 
 def get_model_details(key=None, force_fetch=False):
